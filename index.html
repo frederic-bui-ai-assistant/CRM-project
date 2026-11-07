@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon CRM</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1c2330;--muted:#6b7385;--line:#e4e7ee;--brand:#3b5bdb;--brand-d:#2f49b0;--ok:#2f9e5b;--warn:#e8890c;--bad:#d6336c}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.45}
+a{color:var(--brand);text-decoration:none;cursor:pointer}a:hover{text-decoration:underline}
+header{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.bar{max-width:1100px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.logo{font-weight:700;font-size:17px}
+nav{display:flex;gap:4px;flex:1;flex-wrap:wrap}
+nav a{padding:6px 12px;border-radius:8px;color:var(--muted);font-weight:500}
+nav a.on,nav a:hover{background:#eef1fb;color:var(--brand);text-decoration:none}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:0 0 10px}
+.sub{color:var(--muted);margin:0 0 18px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{justify-content:space-between}
+.grid{display:grid;gap:14px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.stat b{font-size:26px;display:block}.stat span{color:var(--muted);font-size:13px}
+.btn{background:var(--brand);color:#fff;border:0;border-radius:8px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.btn:hover{background:var(--brand-d)}
+.btn.ghost{background:#fff;color:var(--text);border:1px solid var(--line)}
+.btn.ghost:hover{background:#f1f3f8}
+.btn.danger{background:#fff;color:var(--bad);border:1px solid #f1c0d3}
+.btn.sm{padding:4px 10px;font-size:13px}
+input,select,textarea{font:inherit;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text)}
+input:focus,select:focus,textarea:focus{outline:2px solid #c5d0fa;border-color:var(--brand)}
+label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:10px 0 4px}
+.list>.item{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.list>.item:first-child{border-top:0}
+.item .main{flex:1;min-width:0}.item .t{font-weight:600}.item .m{color:var(--muted);font-size:13px}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600;background:#eef1fb;color:var(--brand);white-space:nowrap}
+.badge.ok{background:#e3f6ea;color:var(--ok)}.badge.warn{background:#fdf0dc;color:var(--warn)}.badge.bad{background:#fde4ee;color:var(--bad)}.badge.gray{background:#eceef3;color:var(--muted)}
+.late{color:var(--bad);font-weight:600}
+.barp{height:6px;background:#eceef3;border-radius:99px;overflow:hidden;min-width:80px}.barp i{display:block;height:100%;background:var(--ok)}
+.chk{width:20px;height:20px;border:2px solid #b8bfd0;border-radius:6px;background:#fff;cursor:pointer;flex:none;padding:0;display:grid;place-items:center;color:#fff;font-size:13px}
+.chk.on{background:var(--ok);border-color:var(--ok)}
+.done .t{text-decoration:line-through;color:var(--muted)}
+.empty{color:var(--muted);padding:14px 0;text-align:center}
+.modal{position:fixed;inset:0;background:rgba(20,26,40,.45);display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto;z-index:20}
+.modal form{background:#fff;border-radius:14px;padding:20px;width:100%;max-width:480px}
+.auth{max-width:360px;margin:12vh auto;padding:0 16px}
+.err{color:var(--bad);font-size:13px;margin-top:8px;min-height:18px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1c2330;color:#fff;padding:9px 16px;border-radius:8px;display:none;z-index:30}
+.filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}.filters>*{width:auto;flex:1;min-width:130px}
+@media(max-width:600px){.bar{gap:8px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+<script>
+// ====== CONFIG SUPABASE ======
+const SUPABASE_URL = "https://grsawivtqtwlfgienrni.supabase.co";
+const SUPABASE_KEY = "sb_publishable_ln5Z4ZCQatPN8yN_TwmxJA_TO1ACkj6";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ====== LIBELLÉS ======
+const L = {
+  client:{prospect:'Prospect',actif:'Actif',inactif:'Inactif',archive:'Archivé'},
+  project:{a_demarrer:'À démarrer',en_cours:'En cours',en_pause:'En pause',termine:'Terminé',annule:'Annulé'},
+  task:{a_faire:'À faire',en_cours:'En cours',en_attente:'En attente',termine:'Terminé'},
+  prio:{basse:'Basse',normale:'Normale',haute:'Haute',urgente:'Urgente'}
+};
+const opts = o => Object.entries(o);
+const BADGE = {actif:'ok',prospect:'',inactif:'gray',archive:'gray',en_cours:'',a_demarrer:'gray',en_pause:'warn',termine:'ok',annule:'gray',a_faire:'gray',en_attente:'warn',urgente:'bad',haute:'warn',normale:'gray',basse:'gray'};
+
+// ====== ÉTAT ======
+let S = {user:null, clients:[], contacts:[], projects:[], tasks:[]};
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const fmt = d => d ? new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+const badge = (map,k) => `<span class="badge ${BADGE[k]||''}">${esc(L[map][k]||k)}</span>`;
+const late = t => t.due_date && t.due_date < today() && t.status !== 'termine';
+const clientName = id => (S.clients.find(c=>c.id===id)||{}).name || '—';
+const toast = m => { const t=$('#toast'); t.textContent=m; t.style.display='block'; clearTimeout(toast.h); toast.h=setTimeout(()=>t.style.display='none',2800); };
+
+// ====== AUTH ======
+function renderAuth(msg=''){
+  $('#app').innerHTML = `<div class="auth"><div class="card">
+    <h1>Mon CRM</h1><p class="sub">Connectez-vous pour accéder à vos clients et projets.</p>
+    <form id="af"><label>Email</label><input type="email" id="em" required autocomplete="email">
+    <label>Mot de passe</label><input type="password" id="pw" required minlength="6" autocomplete="current-password">
+    <div class="err" id="ae">${esc(msg)}</div>
+    <div class="row" style="margin-top:8px"><button class="btn" type="submit">Se connecter</button>
+    <button class="btn ghost" type="button" id="su">Créer le compte</button></div></form></div></div>`;
+  $('#af').onsubmit = async e => { e.preventDefault();
+    const {error} = await sb.auth.signInWithPassword({email:$('#em').value,password:$('#pw').value});
+    if(error) $('#ae').textContent = error.message; };
+  $('#su').onclick = async () => {
+    const email=$('#em').value, password=$('#pw').value;
+    if(!email||password.length<6){ $('#ae').textContent='Email et mot de passe (6 caractères min.) requis.'; return; }
+    const {data,error} = await sb.auth.signUp({email,password});
+    if(error) $('#ae').textContent = error.message;
+    else if(!data.session) $('#ae').textContent = 'Compte créé : vérifiez vos emails pour confirmer, puis connectez-vous.';
+  };
+}
+async function logout(){ await sb.auth.signOut(); }
+
+// ====== DONNÉES ======
+async function loadAll(){
+  const q = [
+    sb.from('clients').select('*').order('name'),
+    sb.from('contacts').select('*').order('created_at'),
+    sb.from('projects').select('*').order('deadline',{ascending:true,nullsFirst:false}),
+    sb.from('tasks').select('*').order('due_date',{ascending:true,nullsFirst:false})
+  ];
+  const r = await Promise.all(q);
+  const bad = r.find(x=>x.error); if(bad){ toast('Erreur : '+bad.error.message); return; }
+  [S.clients,S.contacts,S.projects,S.tasks] = r.map(x=>x.data);
+}
+async function save(table,id,data){
+  for(const k in data) if(data[k]==='') data[k]=null;
+  const res = id ? await sb.from(table).update(data).eq('id',id) : await sb.from(table).insert(data);
+  if(res.error){ toast('Erreur : '+res.error.message); return false; }
+  await loadAll(); route(); toast('Enregistré'); return true;
+}
+async function remove(table,id,label){
+  if(!confirm('Supprimer '+label+' ? Cette action est définitive.')) return;
+  const {error} = await sb.from(table).delete().eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  await loadAll(); closeModal();
+  if(location.hash.startsWith('#client/')||location.hash.startsWith('#project/')) location.hash = location.hash.startsWith('#client/')?'#clients':'#projects';
+  route(); toast('Supprimé');
+}
+
+// ====== FORMULAIRE MODAL ======
+function closeModal(){ const m=$('.modal'); if(m) m.remove(); }
+function openForm({title,fields,values={},table,id,extra={},delLabel}){
+  closeModal();
+  const f = fields.map(x=>{
+    const v = values[x.k] ?? x.def ?? '';
+    let inp;
+    if(x.t==='textarea') inp = `<textarea name="${x.k}" rows="3">${esc(v)}</textarea>`;
+    else if(x.t==='select') inp = `<select name="${x.k}" ${x.req?'required':''}>${x.req?'':'<option value="">—</option>'}${x.o.map(([val,lab])=>`<option value="${esc(val)}" ${val===v?'selected':''}>${esc(lab)}</option>`).join('')}</select>`;
+    else inp = `<input name="${x.k}" type="${x.t||'text'}" value="${esc(v)}" ${x.req?'required':''} ${x.t==='number'?'step="0.01"':''}>`;
+    return `<label>${esc(x.l)}</label>${inp}`;
+  }).join('');
+  const m = document.createElement('div'); m.className='modal';
+  m.innerHTML = `<form><h2>${esc(title)}</h2>${f}<div class="row spread" style="margin-top:18px">
+    <div>${id?'<button type="button" class="btn danger" id="mdel">Supprimer</button>':''}</div>
+    <div class="row"><button type="button" class="btn ghost" id="mcx">Annuler</button><button class="btn" type="submit">Enregistrer</button></div></div></form>`;
+  document.body.appendChild(m);
+  m.onclick = e => { if(e.target===m) closeModal(); };
+  m.querySelector('#mcx').onclick = closeModal;
+  if(id) m.querySelector('#mdel').onclick = () => remove(table,id,delLabel||'cet élément');
+  m.querySelector('form').onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target), data = {...extra};
+    fields.forEach(x=>{ let v=fd.get(x.k); if(x.t==='number') v = v===''?null:Number(v); data[x.k]=v; });
+    if(await save(table,id,data)) closeModal();
+  };
+}
+
+// ====== DÉFINITIONS DES CHAMPS ======
+const clientFields = [
+  {k:'name',l:'Nom du client',req:1},{k:'status',l:'Statut',t:'select',o:opts(L.client),req:1,def:'prospect'},
+  {k:'industry',l:'Secteur'},{k:'email',l:'Email',t:'email'},{k:'phone',l:'Téléphone'},{k:'website',l:'Site web'},
+  {k:'address',l:'Adresse'},{k:'postal_code',l:'Code postal'},{k:'city',l:'Ville'},{k:'siret',l:'SIRET'},{k:'notes',l:'Notes',t:'textarea'}];
+const contactFields = [
+  {k:'first_name',l:'Prénom',req:1},{k:'last_name',l:'Nom'},{k:'job_title',l:'Fonction'},
+  {k:'email',l:'Email',t:'email'},{k:'phone',l:'Téléphone'},{k:'notes',l:'Notes',t:'textarea'}];
+const projectFields = () => [
+  {k:'name',l:'Nom du projet',req:1},
+  {k:'client_id',l:'Client',t:'select',o:S.clients.map(c=>[c.id,c.name])},
+  {k:'status',l:'Statut',t:'select',o:opts(L.project),req:1,def:'a_demarrer'},
+  {k:'priority',l:'Priorité',t:'select',o:opts(L.prio),req:1,def:'normale'},
+  {k:'start_date',l:'Début',t:'date'},{k:'deadline',l:'Deadline',t:'date'},
+  {k:'budget',l:'Budget (€)',t:'number'},{k:'description',l:'Description',t:'textarea'}];
+const taskFields = () => [
+  {k:'title',l:'Titre de la tâche',req:1},
+  {k:'project_id',l:'Projet',t:'select',o:S.projects.map(p=>[p.id,p.name+' — '+clientName(p.client_id)]),req:1},
+  {k:'status',l:'Statut',t:'select',o:opts(L.task),req:1,def:'a_faire'},
+  {k:'priority',l:'Priorité',t:'select',o:opts(L.prio),req:1,def:'normale'},
+  {k:'due_date',l:'Échéance',t:'date'},{k:'estimated_hours',l:'Heures estimées',t:'number'},
+  {k:'description',l:'Description',t:'textarea'}];
+
+const newClient = () => openForm({title:'Nouveau client',fields:clientFields,table:'clients'});
+const editClient = id => openForm({title:'Modifier le client',fields:clientFields,values:S.clients.find(x=>x.id===id),table:'clients',id,delLabel:'ce client (ses contacts seront supprimés)'});
+const newContact = cid => openForm({title:'Nouveau contact',fields:contactFields,table:'contacts',extra:{client_id:cid}});
+const editContact = id => openForm({title:'Modifier le contact',fields:contactFields,values:S.contacts.find(x=>x.id===id),table:'contacts',id,delLabel:'ce contact'});
+const newProject = cid => openForm({title:'Nouveau projet',fields:projectFields(),values:{client_id:cid||''},table:'projects'});
+const editProject = id => openForm({title:'Modifier le projet',fields:projectFields(),values:S.projects.find(x=>x.id===id),table:'projects',id,delLabel:'ce projet et toutes ses tâches'});
+const newTask = pid => { if(!S.projects.length){ toast("Créez d'abord un projet"); return; }
+  openForm({title:'Nouvelle tâche',fields:taskFields(),values:{project_id:pid||''},table:'tasks'}); };
+const editTask = id => openForm({title:'Modifier la tâche',fields:taskFields(),values:S.tasks.find(x=>x.id===id),table:'tasks',id,delLabel:'cette tâche'});
+async function toggleTask(id){
+  const t = S.tasks.find(x=>x.id===id);
+  const {error} = await sb.from('tasks').update({status:t.status==='termine'?'a_faire':'termine'}).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  await loadAll(); route();
+}
+
+// ====== BLOCS D'AFFICHAGE ======
+const progress = pid => { const ts=S.tasks.filter(t=>t.project_id===pid); return ts.length ? Math.round(100*ts.filter(t=>t.status==='termine').length/ts.length) : 0; };
+function taskRow(t,showProject=true){
+  const p = S.projects.find(x=>x.id===t.project_id);
+  const done = t.status==='termine';
+  return `<div class="item ${done?'done':''}">
+    <button class="chk ${done?'on':''}" onclick="toggleTask('${t.id}')" title="Terminer">${done?'✓':''}</button>
+    <div class="main"><div class="t"><a onclick="editTask('${t.id}')">${esc(t.title)}</a></div>
+    <div class="m">${showProject&&p?`<a href="#project/${p.id}">${esc(p.name)}</a> · ${esc(clientName(p.client_id))} · `:''}<span class="${late(t)?'late':''}">${t.due_date?'Échéance '+fmt(t.due_date)+(late(t)?' (en retard)':''):'Sans échéance'}</span></div></div>
+    ${badge('prio',t.priority)}${done?'':badge('task',t.status)}</div>`;
+}
+function projectRow(p){
+  const pr = progress(p.id), lt = p.deadline && p.deadline < today() && !['termine','annule'].includes(p.status);
+  return `<div class="item"><div class="main"><div class="t"><a href="#project/${p.id}">${esc(p.name)}</a></div>
+    <div class="m">${esc(clientName(p.client_id))} · <span class="${lt?'late':''}">Deadline ${fmt(p.deadline)}</span></div></div>
+    <div style="width:90px"><div class="barp"><i style="width:${pr}%"></i></div><div class="m" style="text-align:right">${pr}%</div></div>
+    ${badge('project',p.status)}</div>`;
+}
+
+// ====== VUES ======
+function viewDashboard(){
+  const open = S.tasks.filter(t=>t.status!=='termine');
+  const overdue = open.filter(late);
+  const in14 = new Date(); in14.setDate(in14.getDate()+14); const lim = in14.toISOString().slice(0,10);
+  const upcoming = open.filter(t=>t.due_date && t.due_date>=today() && t.due_date<=lim);
+  const active = S.projects.filter(p=>p.status==='en_cours');
+  return `<h1>Tableau de bord</h1><p class="sub">Vue d'ensemble de votre activité.</p>
+  <div class="grid g4" style="margin-bottom:14px">
+    <div class="card stat"><b>${S.clients.filter(c=>c.status==='actif').length}</b><span>Clients actifs</span></div>
+    <div class="card stat"><b>${active.length}</b><span>Projets en cours</span></div>
+    <div class="card stat"><b>${open.length}</b><span>Tâches ouvertes</span></div>
+    <div class="card stat"><b class="${overdue.length?'late':''}">${overdue.length}</b><span>Tâches en retard</span></div></div>
+  <div class="grid g2">
+    <div class="card"><h2>En retard</h2><div class="list">${overdue.map(t=>taskRow(t)).join('')||'<div class="empty">Rien en retard 🎉</div>'}</div></div>
+    <div class="card"><h2>À venir (14 jours)</h2><div class="list">${upcoming.map(t=>taskRow(t)).join('')||'<div class="empty">Aucune échéance proche</div>'}</div></div>
+    <div class="card" style="grid-column:1/-1"><h2>Projets en cours</h2><div class="list">${active.map(projectRow).join('')||'<div class="empty">Aucun projet en cours</div>'}</div></div>
+  </div>`;
+}
+function viewClients(){
+  const q = (S.fc||'').toLowerCase(), st = S.fcs||'';
+  const list = S.clients.filter(c=>(!q||c.name.toLowerCase().includes(q)||(c.city||'').toLowerCase().includes(q))&&(!st||c.status===st));
+  return `<div class="row spread"><div><h1>Clients</h1><p class="sub">${S.clients.length} client(s)</p></div><button class="btn" onclick="newClient()">+ Client</button></div>
+  <div class="filters"><input id="fq" placeholder="Rechercher…" value="${esc(S.fc||'')}">
+  <select id="fs"><option value="">Tous les statuts</option>${opts(L.client).map(([k,v])=>`<option value="${k}" ${st===k?'selected':''}>${v}</option>`).join('')}</select></div>
+  <div class="card"><div class="list">${list.map(c=>{
+    const np = S.projects.filter(p=>p.client_id===c.id).length;
+    return `<div class="item"><div class="main"><div class="t"><a href="#client/${c.id}">${esc(c.name)}</a></div>
+    <div class="m">${[c.industry,c.city,c.email].filter(Boolean).map(esc).join(' · ')||'—'} · ${np} projet(s)</div></div>${badge('client',c.status)}</div>`;}).join('')||'<div class="empty">Aucun client</div>'}</div></div>`;
+}
+function viewClient(id){
+  const c = S.clients.find(x=>x.id===id); if(!c) return '<div class="empty">Client introuvable. <a href="#clients">Retour</a></div>';
+  const cts = S.contacts.filter(x=>x.client_id===id), prj = S.projects.filter(p=>p.client_id===id);
+  return `<p><a href="#clients">← Clients</a></p>
+  <div class="row spread"><div><h1>${esc(c.name)}</h1><p class="sub">${badge('client',c.status)} ${esc(c.industry||'')}</p></div>
+  <button class="btn ghost" onclick="editClient('${id}')">Modifier</button></div>
+  <div class="grid g2">
+    <div class="card"><h2>Coordonnées</h2><div class="m" style="line-height:1.8">
+      ${c.email?'✉ '+esc(c.email)+'<br>':''}${c.phone?'☎ '+esc(c.phone)+'<br>':''}${c.website?'🌐 '+esc(c.website)+'<br>':''}
+      ${[c.address,c.postal_code,c.city].filter(Boolean).map(esc).join(', ')}${c.siret?'<br>SIRET : '+esc(c.siret):''}
+      ${c.notes?'<hr style="border:0;border-top:1px solid var(--line)"><div style="white-space:pre-wrap;color:var(--text)">'+esc(c.notes)+'</div>':''}</div></div>
+    <div class="card"><div class="row spread"><h2>Contacts</h2><button class="btn sm" onclick="newContact('${id}')">+ Contact</button></div>
+      <div class="list">${cts.map(x=>`<div class="item"><div class="main"><div class="t"><a onclick="editContact('${x.id}')">${esc(x.first_name+' '+(x.last_name||''))}</a></div>
+      <div class="m">${[x.job_title,x.email,x.phone].filter(Boolean).map(esc).join(' · ')}</div></div></div>`).join('')||'<div class="empty">Aucun contact</div>'}</div></div>
+    <div class="card" style="grid-column:1/-1"><div class="row spread"><h2>Projets</h2><button class="btn sm" onclick="newProject('${id}')">+ Projet</button></div>
+      <div class="list">${prj.map(projectRow).join('')||'<div class="empty">Aucun projet pour ce client</div>'}</div></div>
+  </div>`;
+}
+function viewProjects(){
+  const st = S.fps||'', cl = S.fpc||'';
+  const list = S.projects.filter(p=>(!st||p.status===st)&&(!cl||p.client_id===cl));
+  return `<div class="row spread"><div><h1>Projets</h1><p class="sub">${S.projects.length} projet(s)</p></div><button class="btn" onclick="newProject()">+ Projet</button></div>
+  <div class="filters">
+  <select id="fps"><option value="">Tous les statuts</option>${opts(L.project).map(([k,v])=>`<option value="${k}" ${st===k?'selected':''}>${v}</option>`).join('')}</select>
+  <select id="fpc"><option value="">Tous les clients</option>${S.clients.map(c=>`<option value="${c.id}" ${cl===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+  <div class="card"><div class="list">${list.map(projectRow).join('')||'<div class="empty">Aucun projet</div>'}</div></div>`;
+}
+function viewProject(id){
+  const p = S.projects.find(x=>x.id===id); if(!p) return '<div class="empty">Projet introuvable. <a href="#projects">Retour</a></div>';
+  const ts = S.tasks.filter(t=>t.project_id===id), pr = progress(id);
+  return `<p><a href="#projects">← Projets</a></p>
+  <div class="row spread"><div><h1>${esc(p.name)}</h1><p class="sub">${p.client_id?`<a href="#client/${p.client_id}">${esc(clientName(p.client_id))}</a> · `:''}${badge('project',p.status)} ${badge('prio',p.priority)}</p></div>
+  <button class="btn ghost" onclick="editProject('${id}')">Modifier</button></div>
+  <div class="grid g4" style="margin-bottom:14px">
+    <div class="card stat"><b style="font-size:18px">${fmt(p.start_date)}</b><span>Début</span></div>
+    <div class="card stat"><b style="font-size:18px" class="${p.deadline&&p.deadline<today()&&!['termine','annule'].includes(p.status)?'late':''}">${fmt(p.deadline)}</b><span>Deadline</span></div>
+    <div class="card stat"><b style="font-size:18px">${p.budget!=null?Number(p.budget).toLocaleString('fr-FR')+' €':'—'}</b><span>Budget</span></div>
+    <div class="card stat"><b style="font-size:18px">${pr}%</b><span>Avancement</span><div class="barp" style="margin-top:6px"><i style="width:${pr}%"></i></div></div></div>
+  ${p.description?`<div class="card" style="margin-bottom:14px;white-space:pre-wrap">${esc(p.description)}</div>`:''}
+  <div class="card"><div class="row spread"><h2>Tâches (${ts.length})</h2><button class="btn sm" onclick="newTask('${id}')">+ Tâche</button></div>
+  <div class="list">${ts.map(t=>taskRow(t,false)).join('')||'<div class="empty">Aucune tâche</div>'}</div></div>`;
+}
+function viewTasks(){
+  const st = S.fts ?? 'ouvertes', cl = S.ftc||'';
+  const list = S.tasks.filter(t=>{
+    const p = S.projects.find(x=>x.id===t.project_id);
+    const okS = st==='ouvertes' ? t.status!=='termine' : st==='retard' ? late(t) : st ? t.status===st : true;
+    return okS && (!cl || (p && p.client_id===cl));
+  });
+  return `<div class="row spread"><div><h1>Tâches</h1><p class="sub">${list.length} tâche(s)</p></div><button class="btn" onclick="newTask()">+ Tâche</button></div>
+  <div class="filters">
+  <select id="fts"><option value="ouvertes" ${st==='ouvertes'?'selected':''}>Ouvertes</option><option value="retard" ${st==='retard'?'selected':''}>En retard</option><option value="" ${st===''?'selected':''}>Toutes</option>${opts(L.task).map(([k,v])=>`<option value="${k}" ${st===k?'selected':''}>${v}</option>`).join('')}</select>
+  <select id="ftc"><option value="">Tous les clients</option>${S.clients.map(c=>`<option value="${c.id}" ${cl===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+  <div class="card"><div class="list">${list.map(t=>taskRow(t)).join('')||'<div class="empty">Aucune tâche</div>'}</div></div>`;
+}
+
+// ====== ROUTEUR ======
+function route(){
+  if(!S.user) return;
+  const h = location.hash.slice(1) || 'dashboard', [page,id] = h.split('/');
+  const views = {dashboard:viewDashboard, clients:viewClients, client:()=>viewClient(id), projects:viewProjects, project:()=>viewProject(id), tasks:viewTasks};
+  const on = {client:'clients',project:'projects'}[page] || page;
+  const nav = [['dashboard','Tableau de bord'],['clients','Clients'],['projects','Projets'],['tasks','Tâches']];
+  $('#app').innerHTML = `<header><div class="bar"><span class="logo">📇 Mon CRM</span>
+    <nav>${nav.map(([k,v])=>`<a href="#${k}" class="${on===k?'on':''}">${v}</a>`).join('')}</nav>
+    <span class="m">${esc(S.user.email)}</span><button class="btn ghost sm" onclick="logout()">Déconnexion</button></div></header>
+    <main>${(views[page]||viewDashboard)()}</main>`;
+  const bind = (sel,key,ev='onchange') => { const el=$(sel); if(el) el[ev] = () => { S[key]=el.value; route(); }; };
+  bind('#fs','fcs'); bind('#fps','fps'); bind('#fpc','fpc'); bind('#fts','fts'); bind('#ftc','ftc');
+  const fq = $('#fq'); if(fq){ fq.oninput = () => { S.fc=fq.value; const pos=fq.selectionStart; route(); const n=$('#fq'); n.focus(); n.setSelectionRange(pos,pos); }; }
+}
+window.addEventListener('hashchange', route);
+
+// ====== DÉMARRAGE ======
+sb.auth.onAuthStateChange(async (_e, session) => {
+  S.user = session ? session.user : null;
+  if(!S.user){ renderAuth(); return; }
+  await loadAll(); route();
+});
+sb.auth.getSession().then(({data}) => { if(!data.session) renderAuth(); });
+</script>
+</body>
+</html>
