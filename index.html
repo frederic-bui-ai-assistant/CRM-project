@@ -66,7 +66,6 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ====== LIBELLÉS ======
 const L = {
-  client:{prospect:'Prospect',actif:'Actif',inactif:'Inactif',archive:'Archivé'},
   project:{a_demarrer:'À démarrer',en_cours:'En cours',en_pause:'En pause',termine:'Terminé',annule:'Annulé'},
   task:{a_faire:'À faire',en_cours:'En cours',en_attente:'En attente',termine:'Terminé'},
   prio:{basse:'Basse',normale:'Normale',haute:'Haute',urgente:'Urgente'}
@@ -163,10 +162,7 @@ function openForm({title,fields,values={},table,id,extra={},delLabel}){
 }
 
 // ====== DÉFINITIONS DES CHAMPS ======
-const clientFields = [
-  {k:'name',l:'Nom du client',req:1},{k:'status',l:'Statut',t:'select',o:opts(L.client),req:1,def:'prospect'},
-  {k:'industry',l:'Secteur'},{k:'email',l:'Email',t:'email'},{k:'phone',l:'Téléphone'},{k:'website',l:'Site web'},
-  {k:'address',l:'Adresse'},{k:'postal_code',l:'Code postal'},{k:'city',l:'Ville'},{k:'siret',l:'SIRET'},{k:'notes',l:'Notes',t:'textarea'}];
+const clientFields = [{k:'name',l:'Nom du client',req:1}];
 const contactFields = [
   {k:'first_name',l:'Prénom',req:1},{k:'last_name',l:'Nom'},{k:'job_title',l:'Fonction'},
   {k:'email',l:'Email',t:'email'},{k:'phone',l:'Téléphone'},{k:'notes',l:'Notes',t:'textarea'}];
@@ -229,7 +225,7 @@ function viewDashboard(){
   const active = S.projects.filter(p=>p.status==='en_cours');
   return `<h1>Tableau de bord</h1><p class="sub">Vue d'ensemble de votre activité.</p>
   <div class="grid g4" style="margin-bottom:14px">
-    <div class="card stat"><b>${S.clients.filter(c=>c.status==='actif').length}</b><span>Clients actifs</span></div>
+    <div class="card stat"><b>${S.clients.length}</b><span>Clients</span></div>
     <div class="card stat"><b>${active.length}</b><span>Projets en cours</span></div>
     <div class="card stat"><b>${open.length}</b><span>Tâches ouvertes</span></div>
     <div class="card stat"><b class="${overdue.length?'late':''}">${overdue.length}</b><span>Tâches en retard</span></div></div>
@@ -240,27 +236,22 @@ function viewDashboard(){
   </div>`;
 }
 function viewClients(){
-  const q = (S.fc||'').toLowerCase(), st = S.fcs||'';
-  const list = S.clients.filter(c=>(!q||c.name.toLowerCase().includes(q)||(c.city||'').toLowerCase().includes(q))&&(!st||c.status===st));
+  const q = (S.fc||'').toLowerCase();
+  const list = S.clients.filter(c=>!q||c.name.toLowerCase().includes(q));
   return `<div class="row spread"><div><h1>Clients</h1><p class="sub">${S.clients.length} client(s)</p></div><button class="btn" onclick="newClient()">+ Client</button></div>
-  <div class="filters"><input id="fq" placeholder="Rechercher…" value="${esc(S.fc||'')}">
-  <select id="fs"><option value="">Tous les statuts</option>${opts(L.client).map(([k,v])=>`<option value="${k}" ${st===k?'selected':''}>${v}</option>`).join('')}</select></div>
+  <div class="filters"><input id="fq" placeholder="Rechercher un client…" value="${esc(S.fc||'')}"></div>
   <div class="card"><div class="list">${list.map(c=>{
     const np = S.projects.filter(p=>p.client_id===c.id).length;
     return `<div class="item"><div class="main"><div class="t"><a href="#client/${c.id}">${esc(c.name)}</a></div>
-    <div class="m">${[c.industry,c.city,c.email].filter(Boolean).map(esc).join(' · ')||'—'} · ${np} projet(s)</div></div>${badge('client',c.status)}</div>`;}).join('')||'<div class="empty">Aucun client</div>'}</div></div>`;
+    <div class="m">${np} projet(s)</div></div></div>`;}).join('')||'<div class="empty">Aucun client</div>'}</div></div>`;
 }
 function viewClient(id){
   const c = S.clients.find(x=>x.id===id); if(!c) return '<div class="empty">Client introuvable. <a href="#clients">Retour</a></div>';
   const cts = S.contacts.filter(x=>x.client_id===id), prj = S.projects.filter(p=>p.client_id===id);
   return `<p><a href="#clients">← Clients</a></p>
-  <div class="row spread"><div><h1>${esc(c.name)}</h1><p class="sub">${badge('client',c.status)} ${esc(c.industry||'')}</p></div>
+  <div class="row spread"><div><h1>${esc(c.name)}</h1><p class="sub">${prj.length} projet(s) · ${cts.length} contact(s)</p></div>
   <button class="btn ghost" onclick="editClient('${id}')">Modifier</button></div>
   <div class="grid g2">
-    <div class="card"><h2>Coordonnées</h2><div class="m" style="line-height:1.8">
-      ${c.email?'✉ '+esc(c.email)+'<br>':''}${c.phone?'☎ '+esc(c.phone)+'<br>':''}${c.website?'🌐 '+esc(c.website)+'<br>':''}
-      ${[c.address,c.postal_code,c.city].filter(Boolean).map(esc).join(', ')}${c.siret?'<br>SIRET : '+esc(c.siret):''}
-      ${c.notes?'<hr style="border:0;border-top:1px solid var(--line)"><div style="white-space:pre-wrap;color:var(--text)">'+esc(c.notes)+'</div>':''}</div></div>
     <div class="card"><div class="row spread"><h2>Contacts</h2><button class="btn sm" onclick="newContact('${id}')">+ Contact</button></div>
       <div class="list">${cts.map(x=>`<div class="item"><div class="main"><div class="t"><a onclick="editContact('${x.id}')">${esc(x.first_name+' '+(x.last_name||''))}</a></div>
       <div class="m">${[x.job_title,x.email,x.phone].filter(Boolean).map(esc).join(' · ')}</div></div></div>`).join('')||'<div class="empty">Aucun contact</div>'}</div></div>
@@ -318,7 +309,7 @@ function route(){
     <span class="m">${esc(S.user.email)}</span><button class="btn ghost sm" onclick="logout()">Déconnexion</button></div></header>
     <main>${(views[page]||viewDashboard)()}</main>`;
   const bind = (sel,key,ev='onchange') => { const el=$(sel); if(el) el[ev] = () => { S[key]=el.value; route(); }; };
-  bind('#fs','fcs'); bind('#fps','fps'); bind('#fpc','fpc'); bind('#fts','fts'); bind('#ftc','ftc');
+  bind('#fps','fps'); bind('#fpc','fpc'); bind('#fts','fts'); bind('#ftc','ftc');
   const fq = $('#fq'); if(fq){ fq.oninput = () => { S.fc=fq.value; const pos=fq.selectionStart; route(); const n=$('#fq'); n.focus(); n.setSelectionRange(pos,pos); }; }
 }
 window.addEventListener('hashchange', route);
